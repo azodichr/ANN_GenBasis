@@ -17,13 +17,15 @@ Approach:
 ## Notes on running scripts on HPCC at MSU
 
 * To run on HPCC, need to load a more recent version of R so that freads will work:
-<code>module swap GNU GNU/4.9
+'''
+module swap GNU GNU/4.9
 
 module load OpenMPI/1.10.0
 
-module load R/3.3.2<code/>
+module load R/3.3.2
+'''
 * For some R scripts, additional packages are needed.
-<code> export R_LIBS_USER=/mnt/home/azodichr/R/library <code/>
+    export R_LIBS_USER=/mnt/home/azodichr/R/library
 
 
 ## 1. Get data
@@ -41,13 +43,15 @@ Soy:
 
 ## 1. Remove Duplicate SNPs
 
-<code>module swap GNU GNU/4.9
+'''
+module swap GNU GNU/4.9
 
 module load OpenMPI/1.10.0
 
 module load R/3.3.2
 
-Rscript ~/GitHub/ANN_GenBasis/remove_dups.R geno.csv<code/>
+Rscript ~/GitHub/ANN_GenBasis/remove_dups.R geno.csv
+'''
 Note: soy had 5 exact duplicates, maize had ??
 
 
@@ -58,18 +62,20 @@ Soy: Hold out 10% =
 
 Maize: Hold out 20% = 78 instances
 
-<code>python ~/GitHub/ML-Pipeline/holdout.py -df pheno.csv -sep ',' -type r -p 0.2<code/>
+    python ~/GitHub/ML-Pipeline/holdout.py -df pheno.csv -sep ',' -type r -p 0.2<code/>
 
 ## 3. Feature Engineering/Selection
 
 ### PCA
-Rscript ~/GitHub/ANN_GenBasis/make_feat_PCA.R geno_noDups.csv
+    Rscript ~/GitHub/ANN_GenBasis/make_feat_PCA.R geno_noDups.csv
 
 ### MCA
 Packages needed: FactoMineR & factoextra
-<code>Rscript -e "install.packages('FactoMineR', lib='~/R/library', contriburl=contrib.url('http://cran.r-project.org/'))"
-Rscript -e "install.packages('factoextra', lib='~/R/library', contriburl=contrib.url('http://cran.r-project.org/'))"<code/>
-<code>Rscript ~/GitHub/ANN_GenBasis/make_feat_MCA.R geno_noDups.csv<code/>
+'''
+Rscript -e "install.packages('FactoMineR', lib='~/R/library', contriburl=contrib.url('http://cran.r-project.org/'))"
+Rscript -e "install.packages('factoextra', lib='~/R/library', contriburl=contrib.url('http://cran.r-project.org/'))"
+'''
+    Rscript ~/GitHub/ANN_GenBasis/make_feat_MCA.R geno_noDups.csv
 
 ### Clustering
 Packages needed: mpmi
