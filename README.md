@@ -16,15 +16,16 @@ Approach:
 
 ## Notes on running scripts on HPCC at MSU
 
-* To run on HPCC, need to load a more recent version of R so that freads will work:
-'''
+To run on HPCC, need to load a more recent version of R so that freads will work:
+```
 module swap GNU GNU/4.9
 
 module load OpenMPI/1.10.0
 
 module load R/3.3.2
-'''
-* For some R scripts, additional packages are needed.
+```
+
+For some R scripts, additional packages are needed.
     export R_LIBS_USER=/mnt/home/azodichr/R/library
 
 
@@ -43,7 +44,7 @@ Soy:
 
 ## 1. Remove Duplicate SNPs
 
-'''
+```
 module swap GNU GNU/4.9
 
 module load OpenMPI/1.10.0
@@ -51,7 +52,7 @@ module load OpenMPI/1.10.0
 module load R/3.3.2
 
 Rscript ~/GitHub/ANN_GenBasis/remove_dups.R geno.csv
-'''
+```
 Note: soy had 5 exact duplicates, maize had ??
 
 
@@ -71,10 +72,10 @@ Maize: Hold out 20% = 78 instances
 
 ### MCA
 Packages needed: FactoMineR & factoextra
-'''
+```
 Rscript -e "install.packages('FactoMineR', lib='~/R/library', contriburl=contrib.url('http://cran.r-project.org/'))"
 Rscript -e "install.packages('factoextra', lib='~/R/library', contriburl=contrib.url('http://cran.r-project.org/'))"
-'''
+```
     Rscript ~/GitHub/ANN_GenBasis/make_feat_MCA.R geno_noDups.csv
 
 ### Clustering
