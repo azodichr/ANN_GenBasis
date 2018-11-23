@@ -11,18 +11,16 @@ Approach: [1] Feature engineering/selection to reduct p:n ratio. [2] Parameter s
 
 ## Notes on running scripts on HPCC at MSU
 
-To run on HPCC, need to load a more recent version of R so that freads will work:
+For R scripts on HPCC run:
 ```
-module swap GNU GNU/4.9
-
-module load OpenMPI/1.10.0
-
-module load R/3.3.2
-```
-
-For some R scripts, additional packages are needed (all available on HPCC here:)
-```
+module load R
 export R_LIBS_USER=/mnt/home/azodichr/R/library
+Rscript -e "install.packages('XXX', lib='~/R/library', contriburl=contrib.url('http://cran.r-project.org/'))"
+```
+
+For python scripts on HPCC, may need to run:
+```
+export PATH=/mnt/home/azodichr/miniconda3/bin:$PATH
 ```
 
 
@@ -54,6 +52,10 @@ d2.to_csv('geno_noDups.csv', sep=',', index=False, header=True)
 Went from 332178 to 242694 markers. 
 
 
+Rice: also did by hand (need to get key of ones that were dropped...) First I only dropped duplicates from geno.csv. Then realized I needed to first, round any estimated SNP values to the nearest value (-1 or 1) and remove the holdout validation set, and THEN remove duplicates! 
+- Starting size: 327 x 73,148
+- After dropping duplicates: 327 x 57,543
+- After dropping duplicates after rounding and removing holdout: 327 x 37,284
 
 
 
@@ -61,7 +63,6 @@ Went from 332178 to 242694 markers.
 
 Soy: Hold out 10% = 501
 Maize: Hold out 20% = 78 instances
-
 Rice: Hold out 20% = 65
 ```python ~/GitHub/ML-Pipeline/holdout.py -df pheno.csv -sep ',' -type r -p 0.2```
 
@@ -75,48 +76,42 @@ Started using 50, 500, and 1000 features for each approach. After rrBLUP and BL 
 ### Dimension Reduction
 
 #### PCA
-```Rscript ~/GitHub/ANN_GenBasis/make_feat_PCA.R geno_noDups.csv```
+```Rscript ~/GitHub/ANN_GenBasis/make_feat_PCA.R geno_use.csv 100,250```
 
 #### MCA
 Packages needed: FactoMineR & factoextra
-```
-Rscript -e "install.packages('FactoMineR', lib='~/R/library', contriburl=contrib.url('http://cran.r-project.org/'))"
-Rscript -e "install.packages('factoextra', lib='~/R/library', contriburl=contrib.url('http://cran.r-project.org/'))"
-```
-```Rscript ~/GitHub/ANN_GenBasis/make_feat_MCA.R geno_noDups.csv```
+```Rscript ~/GitHub/ANN_GenBasis/make_feat_MCA.R geno_use.csv 100,250```
 
 
 
 ### Clustering
-Packages needed: mpmi, cluster (pam only), vegan (jaccard - ji only)
-```
-Rscript -e "install.packages('mpmi', lib='~/R/library', contriburl=contrib.url('http://cran.r-project.org/'))"
-Rscript -e "install.packages('cluster', lib='~/R/library', contriburl=contrib.url('http://cran.r-project.org/'))"
-Rscript -e "install.packages('vegan', lib='~/R/library', contriburl=contrib.url('http://cran.r-project.org/'))"
-```
+Packages needed: mpmi, cluster (pam), vegan (jaccard/ji), cba (rock)
 
 #### PAM
 ```
-Rscript ~/GitHub/ANN_GenBasis/make_feat_Clust.R geno_noDups.csv pam 50
+Rscript ~/GitHub/ANN_GenBasis/make_feat_Clust.R geno_use.csv pam 100
 ```
 
 #### Hierarchical clustering with Euclidean Distance
 ```
-Rscript ~/GitHub/ANN_GenBasis/make_feat_Clust.R geno_noDups.csv hclus 50
+Rscript ~/GitHub/ANN_GenBasis/make_feat_Clust.R geno_use.csv hclus 100
 ```
 
 #### Hierarchical clustering with Jaccard Index
 ```
-Rscript ~/GitHub/ANN_GenBasis/make_feat_Clust.R geno_noDups.csv ji 50
+Rscript ~/GitHub/ANN_GenBasis/make_feat_Clust.R geno_use.csv ji 100
+```
+
+#### Clustering with RObust Clustering using linKs (ROCK)
+```
+Rscript ~/GitHub/ANN_GenBasis/make_feat_Clust.R geno_use.csv rock 100
 ```
 
 Example Submission:
 
 ```
 declare -a nclus=("50" "100" "500" "1000")
-
 declare -a tclus=("pam" "hclus" "ji")
-
 for nc in "${nclus[@]}"; do for tc in "${tclus[@]}"; do echo module swap GNU GNU/4.9";" module load OpenMPI/1.10.0";" module load R/3.3.2";" export R_LIBS_USER=~/R/library";"Rscript /mnt/home/azodichr/GitHub/ANN_GenBasis/make_feat_Clust.R /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/geno_noDups.csv $tc $nc >> run_clust.sh; done; done
 python ~shius/codes/qsub_hpc.py -f submit -u azodichr -c run_clust.sh -w 2000 -m 60 -J clust_rice -wd /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_rice/ 
 ```
@@ -143,30 +138,45 @@ Running on HPCC at MSU:
 ```export PATH=/mnt/home/azodichr/miniconda3/bin:$PATH```
 
 
-#### Random!
-```for i in $(seq 1 10); do python ~/GitHub/ML-Pipeline/Feature_Selection.py -f random -df ../geno_noDups.csv -df2 ../pheno.csv -y_name YLD -n 50,100,500,1000 -sep ',' -save featsel_Random_"$i"; done```
+#### Random
+working directory: 01_Random
+```for i in $(seq 1 100); do python ~/GitHub/ML-Pipeline/Feature_Selection.py -f random -df ../geno_use.csv -df2 ../pheno.csv -y_name YLD -n 100,500,1000 -sep ',' -save fs_RAN_"$i"; done```
+Run time < 10 seconds
 
 
 #### Random Forest
-```python ~/GitHub/ML-Pipeline/Feature_Selection.py -f RF -df geno_noDups.csv -df2 pheno.csv -sep ',' -type r -ho holdout.txt -scores t -y_name YLD -n 50,100,388, 500,1000,4000 -save featsel_YLD_RF```
+```python ~/GitHub/ML-Pipeline/Feature_Selection.py -f RF -df geno_use.csv -df2 pheno.csv -sep ',' -type r -ho holdout.txt -scores t -y_name YLD -n 100,500,1000 -save fs_RF_YLD```
+Run time < 30 seconds
 
 
 #### Elastic Net
-```python ~/GitHub/ML-Pipeline/Feature_Selection.py -f EN -p 0.5 -df geno_noDups.csv -df2 pheno.csv  -sep ',' -ho holdout.txt -scores t -y_name YLD -n 50,100,388,500,1000,4000 -save featsel_YLD_EN```
+```python ~/GitHub/ML-Pipeline/Feature_Selection.py -f EN -p 0.5 -df geno_use.csv -df2 pheno.csv  -sep ',' -ho holdout.txt -scores t -y_name YLD -n 100,500,100 -save featsel_EN_YLD```
+Run time < 30 seconds
 
 * Note for soy: L1:L2 ratio = 0.5 there were 2995, 111, and 295 non-zero features for YLD, R8, and HT, respectively in soy. Ended up using YLD: 0.5 = 2995; R8: 0.08 = 1007; HT: 0.15 = 1049
+* Rice: L1:L2 = 0.25 for HT (1299 >0), L1:L2 = 0.5 for YLD (19092 >0), L1:L2 = 0.15 for FT (1142 >0)
 
 
 #### Relief
 Based on the rebase approach. See [here](https://github.com/EpistasisLab/scikit-rebate) for more info.
 
-```python ~/GitHub/ML-Pipeline/Feature_Selection.py -f relief -df geno_noDups.csv -df2 pheno.csv  -sep ',' -ho holdout.txt -scores t -y_name YLD -n 50,100,500,1000 -save featsel_YLD_RL```
+```python ~/GitHub/ML-Pipeline/Feature_Selection.py -f relief -df geno_use.csv -df2 pheno.csv  -sep ',' -ho holdout.txt -scores t -y_name YLD -n 100,500,1000 -save featsel_YLD_RL```
 
 
 #### Bayes A
-declare -a trait=("FT" "HT" "YLD")
-```python ~/GitHub/ML-Pipeline/Feature_Selection.py -f ba -df geno_noDups.csv -df2 pheno.csv  -sep ',' -ho holdout.txt -scores t -y_name YLD -n 50,100,388, 500,1000,4000 -save featsel_YLD_BA```
+```module load R; export R_LIBS_USER=/mnt/home/azodichr/R/library; python ~/GitHub/ML-Pipeline/Feature_Selection.py -f ba -df geno_use.csv -df2 pheno.csv  -sep ',' -ho holdout.txt -scores t -y_name YLD -n 100,500,100 -save featsel_YLD_BA```
+Run time ~ 10 minutes
 
+#### Information Gain
+Convert trait into categorical variable then calucate information gain using base R.
+Formulas taken from: https://stackoverflow.com/questions/1859554/what-is-entropy-and-information-gain
+```Rscript ~/GitHub/ANN_GenBasis/feat_sel_IG.R geno_use.csv pheno.csv YLD```
+```python ~/GitHub/Utilities/qsub_slurm.py -f submit -u azodichr -c run_IG.txt -A quantgen -w 2000 -m 50 -J riIG -wd /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_rice/```
+
+
+
+python ~/GitHub/Utilities/qsub_slurm.py -f submit -u azodichr -A quantgen -c run_clust.sh -w 329 -m 60 -J ri_FS -wd /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_rice/ 
+```
 
 #### Get the union and intersect of features from the 4 methods tested:
 ```
@@ -185,103 +195,20 @@ Redo with script that counts by cluster (i.e. considered overlapping if select S
 bash run_FSclust_venn.sh
 
 
-#### Information Gain
-Convert trait into categorical variable then calucate information gain using base R.
-Formulas taken from: https://stackoverflow.com/questions/1859554/what-is-entropy-and-information-gain
-```Rscript ~/GitHub/ANN_GenBasis/feat_sel_IG.R geno_noDupscat.csv pheno.csv YLD```
-```python ~/GitHub/Utilities/qsub_slurm.py -f submit -u azodichr -c run_IG.txt -A quantgen -w 2500 -m 50 -J riIG -wd /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_rice/```
+
 
 
 ## 3. Modeling using different feature types/sets
 
-## Soybean!!!
-### rrBLUP
-```
-touch run_rrb.sh
-declare -a trait=("HT" "R8" "YLD")
-for i in mediod_*0.csv; do for t in "${trait[@]}"; do echo module swap GNU GNU/4.9";" module load OpenMPI/1.10.0";" module load R/3.3.2";" export R_LIBS_USER=~/R/library";"Rscript /mnt/home/azodichr/GitHub/GenomicPrediction_2018/scripts/Feature_Selection/predict_FS_rrBLUP.R /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/geno_noDups.csv /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/pheno.csv $i $t /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/holdout.txt $i /mnt/home/azodichr/05_Insight/02_Modeling/sp_soy/ >> run_rrb.sh; done; done
-
-declare -a nfeat=("50" "100" "500" "1000")
-declare -a tfeat=("RF" "BA" "EN" "RL")
-for nf in "${nfeat[@]}"; do for tf in "${tfeat[@]}"; do for t in "${trait[@]}"; do echo module swap GNU GNU/4.9";" module load OpenMPI/1.10.0";" module load R/3.3.2";" export R_LIBS_USER=~/R/library";"Rscript /mnt/home/azodichr/GitHub/GenomicPrediction_2018/scripts/Feature_Selection/predict_FS_rrBLUP.R /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/geno_noDups.csv /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/pheno.csv featsel_"$t"_"$tf"_"$nf" $t /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/holdout.txt "$tf"_$nf /mnt/home/azodichr/05_Insight/02_Modeling/sp_soy/ >> run_rrb.sh; done; done; done
-
-declare -a tfeat=("pca" "mca")
-for nf in "${nfeat[@]}"; do for tf in "${tfeat[@]}"; do for t in "${trait[@]}"; do echo module swap GNU GNU/4.9";" module load OpenMPI/1.10.0";" module load R/3.3.2";" export R_LIBS_USER=~/R/library";"Rscript /mnt/home/azodichr/GitHub/GenomicPrediction_2018/scripts/Feature_Selection/predict_FS_rrBLUP.R /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/geno_"$tf"_"$nf".csv /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/pheno.csv all $t /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/holdout.txt "$tf"_"$nf" /mnt/home/azodichr/05_Insight/02_Modeling/sp_soy/ >> run_rrb.sh; done; done; done
-
-declare -a trait=("HT" "R8" "YLD")
-declare -a ion=("union" "intersection")
-declare -a nfeat=("50" "100" "500" "1000")
-for nf in "${nfeat[@]}"; do for io in "${ion[@]}"; do for t in "${trait[@]}"; do echo module swap GNU GNU/4.9";" module load OpenMPI/1.10.0";" module load R/3.3.2";" export R_LIBS_USER=~/R/library";"Rscript /mnt/home/azodichr/GitHub/GenomicPrediction_2018/scripts/Feature_Selection/predict_FS_rrBLUP.R /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/geno_noDups.csv /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/pheno.csv featsel_"$t"_"$nf"_"$io" $t /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/holdout.txt "$io" /mnt/home/azodichr/05_Insight/02_Modeling/sp_soy/ >> run_rrb.sh; done; done; done
-```
-
-
-
-### Bayesian LASSO
-
-```
-touch run_BL.sh
-declare -a trait=("HT" "R8" "YLD")
-for i in mediod_*0.csv; do for t in "${trait[@]}"; do echo module swap GNU GNU/4.9";" module load OpenMPI/1.10.0";" module load R/3.3.2";" export R_LIBS_USER=~/R/library";"Rscript /mnt/home/azodichr/GitHub/GenomicPrediction_2018/scripts/Feature_Selection/predict_FS_BGLR.R /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/geno_noDups.csv /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/pheno.csv $i $t BL /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/holdout.txt "$i" /mnt/home/azodichr/05_Insight/02_Modeling/sp_soy/ >> run_BL.sh; done; done
-
-declare -a nfeat=("50" "100" "500" "1000")
-declare -a tfeat=("RF" "BA" "EN" "RL")
-for nf in "${nfeat[@]}"; do for tf in "${tfeat[@]}"; do for t in "${trait[@]}"; do echo module swap GNU GNU/4.9";" module load OpenMPI/1.10.0";" module load R/3.3.2";" export R_LIBS_USER=~/R/library";"Rscript /mnt/home/azodichr/GitHub/GenomicPrediction_2018/scripts/Feature_Selection/predict_FS_BGLR.R /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/geno_noDups.csv /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/pheno.csv featsel_"$t"_"$tf"_"$nf" $t BL /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/holdout.txt "$tf"_$nf /mnt/home/azodichr/05_Insight/02_Modeling/sp_soy/ >> run_BL.sh; done; done; done
-
-declare -a tfeat=("pca" "mca")
-for nf in "${nfeat[@]}"; do for tf in "${tfeat[@]}"; do for t in "${trait[@]}"; do echo module swap GNU GNU/4.9";" module load OpenMPI/1.10.0";" module load R/3.3.2";" export R_LIBS_USER=~/R/library";"Rscript /mnt/home/azodichr/GitHub/GenomicPrediction_2018/scripts/Feature_Selection/predict_FS_BGLR.R /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/geno_"$tf"_"$nf".csv /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/pheno.csv all $t BL /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/holdout.txt "$tf"_"$nf" /mnt/home/azodichr/05_Insight/02_Modeling/sp_soy/ >> run_BL.sh; done; done; done
-
-declare -a trait=("HT" "R8" "YLD")
-declare -a ion=("union" "intersection")
-declare -a nfeat=("50" "100" "500" "1000")
-for nf in "${nfeat[@]}"; do for io in "${ion[@]}"; do for t in "${trait[@]}"; do echo module swap GNU GNU/4.9";" module load OpenMPI/1.10.0";" module load R/3.3.2";" export R_LIBS_USER=~/R/library";"Rscript /mnt/home/azodichr/GitHub/GenomicPrediction_2018/scripts/Feature_Selection/predict_FS_BGLR.R /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/geno_noDups.csv /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/pheno.csv featsel_"$t"_"$nf"_"$io" $t BL /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/holdout.txt "$io" /mnt/home/azodichr/05_Insight/02_Modeling/sp_soy/ >> run_BL.sh; done; done; done
-```
-
-
-### Random Forest
-```
-touch run_RF.sh
-declare -a trait=("HT" "R8" "YLD")
-for i in mediod_*0.csv; do for t in "${trait[@]}"; do echo export PATH=/mnt/home/azodichr/miniconda3/bin:\$PATH\;python /mnt/home/azodichr/GitHub/ML-Pipeline/ML_regression.py -df /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/geno_noDups.csv -df2 /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/pheno.csv -y_name $t -feat $i -alg RF -ho /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/holdout.txt -sep ',' -cv 5 -n 100 -p 3 -tag "$i" -save /mnt/home/azodichr/05_Insight/02_Modeling/sp_soy/RF_"$i" >> run_RF.sh; done; done
-
-declare -a nfeat=("50" "100" "500" "1000")
-declare -a tfeat=("RF" "BA" "EN" "RL")
-for nf in "${nfeat[@]}"; do for tf in "${tfeat[@]}"; do for t in "${trait[@]}"; do echo export PATH=/mnt/home/azodichr/miniconda3/bin:\$PATH\;python /mnt/home/azodichr/GitHub/ML-Pipeline/ML_regression.py -df /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/geno_noDups.csv -df2 /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/pheno.csv -y_name $t -feat featsel_"$t"_"$tf"_"$nf" -alg RF -ho /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/holdout.txt -sep ',' -cv 5 -n 100 -p 3 -tag "$tf"_"$nf" -save /mnt/home/azodichr/05_Insight/02_Modeling/sp_soy/RF_"$i" >> run_RF.sh; done; done; done
-
-declare -a tfeat=("pca" "mca")
-for nf in "${nfeat[@]}"; do for tf in "${tfeat[@]}"; do for t in "${trait[@]}"; do echo export PATH=/mnt/home/azodichr/miniconda3/bin:\$PATH\;python /mnt/home/azodichr/GitHub/ML-Pipeline/ML_regression.py -df /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/geno_"$tf"_"$nf".csv -df2 /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/pheno.csv -y_name $t -alg RF -ho /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/holdout.txt -sep ',' -cv 5 -n 100 -p 3 -tag "$tf" -save /mnt/home/azodichr/05_Insight/02_Modeling/sp_soy/RF_"$tf"_"$nf" >> run_RF.sh; done; done; done
-
-declare -a trait=("HT" "R8" "YLD")
-declare -a ion=("union" "intersection")
-declare -a nfeat=("50" "100" "500" "1000")
-for nf in "${nfeat[@]}"; do for io in "${ion[@]}"; do for t in "${trait[@]}"; do echo export PATH=/mnt/home/azodichr/miniconda3/bin:\$PATH\;python /mnt/home/azodichr/GitHub/ML-Pipeline/ML_regression.py -df /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/geno_noDups.csv -df2 /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/pheno.csv -y_name $t -feat featsel_"$t"_"$nf"_"$io" -alg RF -ho /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/holdout.txt -sep ',' -cv 5 -n 100 -p 3 -tag "$tf"_"$nf" -save /mnt/home/azodichr/05_Insight/02_Modeling/sp_soy/RF_"$io"_"$nf" >> run_RF2.sh; done; done; done
-
-
-python ~/GitHub/Utilities/qsub_hpc.py -f submit -u azodichr -c run_RF.sh -w 239 -m 80 -p 3 -A quantgen -J ml_soy -wd /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy
-python ~/GitHub/Utilities/qsub_hpc.py -f submit -u azodichr -c run_RF_missed.sh -w 639 -m 90 -p 7 -A quantgen -J ml_soyPCA -wd /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy
-```
-
-##### Run all features (i.e. no feature selection or engineering #####
-```
-declare -a trait=("HT" "R8" "YLD")
-for t in "${trait[@]}"; do Rscript /mnt/home/azodichr/GitHub/GenomicPrediction_2018/scripts/Feature_Selection/predict_FS_rrBLUP.R /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/geno_noDups.csv /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/pheno.csv all $t /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/holdout.txt all /mnt/home/azodichr/05_Insight/02_Modeling/sp_soy/; done
-
-for t in "${trait[@]}"; do Rscript /mnt/home/azodichr/GitHub/GenomicPrediction_2018/scripts/Feature_Selection/predict_FS_BGLR.R /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/geno_noDups.csv /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/pheno.csv all $t BL /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/holdout.txt all /mnt/home/azodichr/05_Insight/02_Modeling/sp_soy/; done
-
-for t in "${trait[@]}"; do python /mnt/home/azodichr/GitHub/ML-Pipeline/ML_regression.py -df /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/geno_noDups.csv -df2 /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/pheno.csv -y_name $t -alg RF -ho /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_soy/holdout.txt -sep ',' -cv 5 -n 100 -p 3 -tag all -save /mnt/home/azodichr/05_Insight/02_Modeling/sp_soy/RF_"$t"_all; done
-```
-
-
-
-## Rice!!!
 ### rrBLUP
 ```
 touch run_rrb.sh
 declare -a trait=("HT" "FT" "YLD")
-declare -a nfeat=("50" "100" "500" "1000")
+declare -a nfeat=("100" "500" "1000")
 ```
 ##### All
 ```
-for t in "${trait[@]}"; do echo module swap GNU GNU/4.9";" module load OpenMPI/1.10.0";" module load R/3.3.2";" export R_LIBS_USER=~/R/library";"Rscript /mnt/home/azodichr/GitHub/GenomicPrediction_2018/scripts/Feature_Selection/predict_FS_rrBLUP.R /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_rice/geno_noDups.csv /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_rice/pheno.csv all $t /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_rice/holdout.txt all /mnt/home/azodichr/05_Insight/02_Modeling/sp_rice/ >> run_rrb.sh; done
+for t in "${trait[@]}"; do Rscript /mnt/home/azodichr/GitHub/GenomicPrediction_2018/scripts/Feature_Selection/predict_FS_rrBLUP.R /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_rice/geno_use.csv /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_rice/pheno.csv all $t /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_rice/holdout.txt all /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_rice/; done
 ```
 ##### Random Subsets
 ```
