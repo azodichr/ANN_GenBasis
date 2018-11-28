@@ -201,6 +201,13 @@ bash run_FSclust_venn.sh
 ## 3. Modeling using different feature types/sets
 
 ### rrBLUP
+
+Packages Needed:
+-rrBLUP
+-data.table
+-AICcmodavg
+-psych
+
 ```
 touch run_rrb.sh
 declare -a trait=("HT" "FT" "YLD")
@@ -244,6 +251,11 @@ for nf in "${nfeat[@]}"; do for tf in "${tfeat[@]}"; do for t in "${trait[@]}"; 
 
 
 ### Bayesian LASSO
+Packages Needed:
+-BGLR
+-data.table
+-AICcmodavg
+
 ```
 touch run_BL.sh
 declare -a trait=("HT" "FT" "YLD")
