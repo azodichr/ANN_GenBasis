@@ -174,7 +174,7 @@ Formulas taken from: https://stackoverflow.com/questions/1859554/what-is-entropy
 ```python ~/GitHub/Utilities/qsub_slurm.py -f submit -u azodichr -c run_IG.txt -A quantgen -w 2000 -m 50 -J riIG -wd /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_rice/```
 
 
-
+```
 python ~/GitHub/Utilities/qsub_slurm.py -f submit -u azodichr -A quantgen -c run_clust.sh -w 329 -m 60 -J ri_FS -wd /mnt/home/azodichr/05_Insight/01_FeatureEngineering/sp_rice/ 
 ```
 
@@ -186,7 +186,7 @@ mv featsel_YLD_UN featsel_YLD_UN_100
 ```
 
 
-##### Generate Venn Diagrams of how many features overlapped
+#### Generate Venn Diagrams of how many features overlapped
 Example:
 ```python ~/GitHub/Utilities/plot_venn.py -files featsel_YLD_BA_50,featsel_YLD_EN_50,featsel_YLD_RF_50,featsel_YLD_RL_50 -ids BA,EN,RF,RL -save plot_FS_YLD_50```
 ```bash run_FS_venn.sh```
